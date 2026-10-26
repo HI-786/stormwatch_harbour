@@ -1,7 +1,8 @@
 # Stormwatch Harbour Simulation - Assignment 2
 
 ## Student Identification
-- **Student ID Last Digit**: 7
+- **Student ID**: 231737
+- **Last Digit**: 7
 - **Grid Dimensions**: 20 x 12 (Width: 20, Height: 12)
 - **Unsafe Berths (Storms)**: B2, B3
 - **Utility Weights**: w1 = 3.0, w2 = 1.0, w3 = 2.0, w4 = 1000.0
