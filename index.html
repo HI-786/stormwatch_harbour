@@ -60,7 +60,6 @@
             border-radius: 8px;
             image-rendering: pixelated;
         }
-        /* Custom scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #040914; }
         ::-webkit-scrollbar-thumb { background: #1b263b; border-radius: 3px; }
@@ -80,7 +79,7 @@
                     <h1 class="font-bold text-lg text-white tracking-wide">Stormwatch Harbour</h1>
                     <span class="text-xs bg-cyan-950 text-cyan-400 border border-cyan-800 px-2.5 py-0.5 rounded-full font-mono font-medium">ID: ending in 7</span>
                 </div>
-                <p class="text-xs text-slate-400">Agentic AI Simulation &amp; Prompt Security Verification</p>
+                <p class="text-xs text-slate-400">Agentic AI Simulation &amp; Safety Verification System</p>
             </div>
         </div>
 
@@ -126,7 +125,7 @@
                     </div>
                     <div class="flex items-center gap-3 text-xs text-slate-400 font-mono">
                         <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-cyan-400 inline-block"></span> WH (0,15)</span>
-                        <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-blue-500 inline-block"></span> Safe (B2, B3)</span>
+                        <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-emerald-500 inline-block"></span> Safe (B2, B3)</span>
                         <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-rose-500 inline-block"></span> Unsafe (B1, B4)</span>
                     </div>
                 </div>
@@ -136,7 +135,7 @@
                     <canvas id="sim-canvas" class="w-full h-full"></canvas>
                     <!-- Storm Overlay Banner -->
                     <div id="storm-overlay" class="hidden absolute top-4 left-1/2 -translate-x-1/2 bg-rose-950/90 border border-rose-600 text-rose-200 text-xs px-4 py-1.5 rounded-full font-mono font-bold flex items-center gap-2 shadow-xl shadow-rose-950/50 pulse-warning z-10">
-                        <i class="fa-solid fa-triangle-exclamation text-amber-400 text-sm"></i> STORM WARNING ACTIVE - UNSAFE BERTHS B1 &amp; B4 PENALIZED
+                        <i class="fa-solid fa-triangle-exclamation text-amber-400 text-sm"></i> STORM WARNING ACTIVE - UNSAFE BERTHS B1 &amp; B4 EVACUATED
                     </div>
                 </div>
 
@@ -249,8 +248,8 @@
                     <i class="fa-solid fa-terminal text-slate-500"></i>
                 </div>
                 <div id="sys-log" class="h-28 overflow-y-auto flex flex-col gap-1 text-[10.5px] text-slate-300 leading-tight">
-                    <div class="text-slate-500">[000] Simulation initialized with ID ending in 7 rules.</div>
-                    <div class="text-cyan-400/90">[000] Unsafe Berths during storms: B1, B4.</div>
+                    <div class="text-slate-500">[000] Simulation initialized with ID ending in 7 parameters.</div>
+                    <div class="text-cyan-400/90">[000] Unsafe Berths during storms: B1 (3,0), B4 (21,0).</div>
                 </div>
             </div>
 
@@ -343,10 +342,10 @@
         const GRID_ROWS = 16;
         const WAREHOUSE = { x: 0, y: 15 };
         const BERTHS = [
-            { id: 'B1', x: 2, y: 0, unsafeInStorm: true, cargo: 7, ship: 'S-101', totalWait: 0 },
-            { id: 'B2', x: 7, y: 0, unsafeInStorm: false, cargo: 7, ship: 'S-102', totalWait: 0 },
-            { id: 'B3', x: 12, y: 0, unsafeInStorm: false, cargo: 7, ship: 'S-103', totalWait: 0 },
-            { id: 'B4', x: 17, y: 0, unsafeInStorm: true, cargo: 7, ship: 'S-104', totalWait: 0 }
+            { id: 'B1', x: 3, y: 0, unsafeInStorm: true, cargo: 7, ship: 'S-101', totalWait: 0 },
+            { id: 'B2', x: 9, y: 0, unsafeInStorm: false, cargo: 7, ship: 'S-102', totalWait: 0 },
+            { id: 'B3', x: 15, y: 0, unsafeInStorm: false, cargo: 7, ship: 'S-103', totalWait: 0 },
+            { id: 'B4', x: 21, y: 0, unsafeInStorm: true, cargo: 7, ship: 'S-104', totalWait: 0 }
         ];
         const TOTAL_WORKERS = 16;
 
@@ -362,15 +361,16 @@
         let stormKnockouts = 0;
         let activePolicy = 'utility';
 
-        // Worker Agents Setup
+        // Worker Agents Setup with Staggered Initial Spawn to ensure 0 crowding at start
         let workers = [];
         for (let i = 0; i < TOTAL_WORKERS; i++) {
             workers.push({
                 id: i + 1,
-                x: WAREHOUSE.x,
-                y: WAREHOUSE.y,
-                hasCargo: false,
+                x: i % 4,                      // Spawn spread across (0..3, 12..15) near warehouse
+                y: 15 - Math.floor(i / 4),
+                cargo: 0,
                 targetBerth: null,
+                knockedOut: 0,
                 status: 'IDLE'
             });
         }
@@ -414,28 +414,28 @@
             // Draw Warehouse at (0,15)
             ctx.fillStyle = '#00f2fe';
             ctx.shadowColor = '#00f2fe';
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = 8;
             ctx.fillRect(WAREHOUSE.x * cellW, WAREHOUSE.y * cellH, cellW, cellH);
             ctx.shadowBlur = 0;
             ctx.fillStyle = '#070f1e';
             ctx.font = 'bold 9px monospace';
             ctx.textAlign = 'center';
-            ctx.fillText('WH', (WAREHOUSE.x + 0.5) * cellW, (WAREHOUSE.y + 0.6) * cellH);
+            ctx.fillText('WH', (WAREHOUSE.x + 0.5) * cellW, (WAREHOUSE.y + 0.65) * cellH);
 
             // Draw Berths B1..B4
             BERTHS.forEach(b => {
                 const isUnsafe = isStorm && b.unsafeInStorm;
-                ctx.fillStyle = isUnsafe ? '#ef4444' : (b.cargo > 0 ? '#3b82f6' : '#334155');
+                ctx.fillStyle = isUnsafe ? '#ef4444' : (b.cargo > 0 ? '#10b981' : '#334155');
                 
                 if (isUnsafe) {
                     ctx.shadowColor = '#ef4444';
-                    ctx.shadowBlur = 15;
+                    ctx.shadowBlur = 12;
                 }
                 ctx.fillRect(b.x * cellW, b.y * cellH, cellW * 2, cellH);
                 ctx.shadowBlur = 0;
 
                 ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 10px sans-serif';
+                ctx.font = 'bold 9px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.fillText(`${b.id} (${b.cargo})`, (b.x + 1) * cellW, (b.y + 0.7) * cellH);
             });
@@ -447,7 +447,15 @@
 
                 ctx.beginPath();
                 ctx.arc(px, py, Math.min(cellW, cellH) * 0.35, 0, Math.PI * 2);
-                ctx.fillStyle = w.hasCargo ? '#f59e0b' : '#10b981';
+                
+                if (w.knockedOut > 0) {
+                    ctx.fillStyle = '#64748b'; // Knocked out
+                } else if (w.cargo > 0) {
+                    ctx.fillStyle = '#f59e0b'; // Carrying cargo
+                } else {
+                    ctx.fillStyle = '#38bdf8'; // Empty worker
+                }
+                
                 ctx.fill();
                 ctx.strokeStyle = '#070f1e';
                 ctx.lineWidth = 1;
@@ -460,17 +468,13 @@
             });
         }
 
-        // --- UTILITY AGENT POLICY & PATHFINDING (ID Ending in 7) ---
+        // --- UTILITY AGENT POLICY & PATHFINDING ---
         function evaluateBerthUtility(worker, berth) {
             if (berth.cargo <= 0) return -9999;
-            
-            // Unsafe berth storm penalty (w4 = 1000.0)
             if (isStorm && berth.unsafeInStorm && activePolicy !== 'reflex') return -10000;
 
             const dist = Math.abs(worker.x - berth.x) + Math.abs(worker.y - berth.y);
             const w1 = 3.0, w2 = 1.0, w3 = 2.0;
-            
-            // Calculate active crowding at targeted berth
             const crowding = workers.filter(w => w.targetBerth === berth.id).length;
 
             return (w1 * berth.cargo) - (w2 * dist) - (w3 * crowding);
@@ -485,54 +489,57 @@
 
             currentTick++;
 
-            // Update Ship Wait Ticks
+            // Update Ship Wait Counters
             BERTHS.forEach(b => {
                 if (b.cargo > 0) b.totalWait++;
             });
 
-            // Storm Duration Counter
-            if (isStorm) {
+            // Automatic Periodic Storm Handling (20-tick storms every 120 ticks)
+            if (stormTicksLeft > 0) {
                 stormTicksLeft--;
-                if (stormTicksLeft <= 0) {
+                if (stormTicksLeft === 0) {
                     isStorm = false;
                     document.getElementById('storm-overlay').classList.add('hidden');
                     document.getElementById('weather-status').className = "text-emerald-400 font-semibold flex items-center gap-1.5";
                     document.getElementById('weather-status').innerHTML = '<span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span> CLEAR';
                     logSystem(`[TICK ${currentTick}] Storm subsides. Harbour weather cleared.`);
                 }
+            } else if (currentTick % 120 === 0) {
+                triggerStorm(20);
             }
 
-            // Track Cell Occupancy for Anti-Crowding Queue Logic
-            const cellOccupancy = {};
-            const intendedPositions = [];
-
-            // Execute Worker Moves
+            // Track Planned Occupancy Map for Predictive Anti-Crowding Movement
+            let plannedOccupancy = {};
             workers.forEach(w => {
-                // Storm Knockout Check for Reflex Policy at unsafe berths
-                if (isStorm && (w.x === 2 || w.x === 3 || w.x === 17 || w.x === 18) && w.y === 0) {
+                const key = `${w.x},${w.y}`;
+                plannedOccupancy[key] = (plannedOccupancy[key] || 0) + 1;
+            });
+
+            // Worker Step Execution
+            workers.forEach(w => {
+                if (w.knockedOut > 0) {
+                    w.knockedOut--;
+                    return;
+                }
+
+                // Knockout Check on Unsafe Berths during storms
+                const isAtUnsafeBerth = (w.x === 3 || w.x === 4 || w.x === 21 || w.x === 22) && w.y === 0;
+                if (isStorm && isAtUnsafeBerth) {
                     if (activePolicy === 'reflex') {
+                        w.knockedOut = 20;
+                        w.cargo = 0;
                         stormKnockouts++;
                         logSystem(`[ALERT] Worker W${w.id} knocked out by storm at unsafe berth!`);
+                        return;
                     }
                 }
 
-                let nextX = w.x;
-                let nextY = w.y;
+                let targetX = WAREHOUSE.x;
+                let targetY = WAREHOUSE.y;
 
-                if (w.hasCargo) {
-                    // Navigate to Warehouse (0, 15)
-                    if (w.x > WAREHOUSE.x) nextX--;
-                    else if (w.y < WAREHOUSE.y) nextY++;
-
-                    if (nextX === WAREHOUSE.x && nextY === WAREHOUSE.y) {
-                        w.hasCargo = false;
-                        deliveredCargo++;
-                        w.targetBerth = null;
-                        w.status = 'DELIVERED';
-                    }
-                } else {
-                    // Target Berth Selection
-                    if (!w.targetBerth) {
+                if (w.cargo === 0) {
+                    // Pick target berth if current target is invalid or unsafe in storm
+                    if (!w.targetBerth || (isStorm && BERTHS.find(b => b.id === w.targetBerth)?.unsafeInStorm)) {
                         let bestBerth = null;
                         let maxU = -99999;
 
@@ -546,51 +553,89 @@
 
                         if (bestBerth && maxU > -5000) {
                             w.targetBerth = bestBerth.id;
-                        }
-                    }
-
-                    // Navigate toward Assigned Berth
-                    if (w.targetBerth) {
-                        const target = BERTHS.find(b => b.id === w.targetBerth);
-                        if (target && target.cargo > 0) {
-                            if (w.x < target.x) nextX++;
-                            else if (w.x > target.x) nextX--;
-                            else if (w.y > target.y) nextY--;
-
-                            if (nextX === target.x && nextY === target.y) {
-                                target.cargo--;
-                                w.hasCargo = true;
-                                w.status = 'LOADED';
-                            }
                         } else {
                             w.targetBerth = null;
                         }
                     }
+
+                    if (w.targetBerth) {
+                        const target = BERTHS.find(b => b.id === w.targetBerth);
+                        if (target) {
+                            targetX = target.x;
+                            targetY = target.y;
+                        }
+                    }
                 }
 
-                // Anti-Crowding Logic: Check collision bounds (>3 per cell)
-                const targetKey = `${nextX},${nextY}`;
-                if ((cellOccupancy[targetKey] || 0) < 3) {
+                // Compute Ideal Movement Step
+                let nextX = w.x;
+                let nextY = w.y;
+
+                if (w.x < targetX) nextX++;
+                else if (w.x > targetX) nextX--;
+                else if (w.y < targetY) nextY++;
+                else if (w.y > targetY) nextY--;
+
+                const currentKey = `${w.x},${w.y}`;
+                const nextKey = `${nextX},${nextY}`;
+
+                // Strict Cell Capacity Check (Max 3 workers per cell)
+                if ((plannedOccupancy[nextKey] || 0) < 3) {
+                    plannedOccupancy[currentKey] = Math.max(0, (plannedOccupancy[currentKey] || 0) - 1);
                     w.x = nextX;
                     w.y = nextY;
-                    cellOccupancy[targetKey] = (cellOccupancy[targetKey] || 0) + 1;
+                    plannedOccupancy[nextKey] = (plannedOccupancy[nextKey] || 0) + 1;
                 } else {
-                    // Queuing delay: Worker holds position to prevent overcrowding
-                    cellOccupancy[`${w.x},${w.y}`] = (cellOccupancy[`${w.x},${w.y}`] || 0) + 1;
-                    crowdingViolations++;
+                    // Stay in place if destination is full to prevent crowding
+                }
+
+                // Delivery or Pick-Up Action Execution
+                if (w.x === WAREHOUSE.x && w.y === WAREHOUSE.y && w.cargo > 0) {
+                    deliveredCargo += w.cargo;
+                    w.cargo = 0;
+                    w.targetBerth = null;
+                } else if (w.targetBerth && w.cargo === 0) {
+                    const target = BERTHS.find(b => b.id === w.targetBerth);
+                    if (target && (w.x === target.x || w.x === target.x + 1) && w.y === target.y && target.cargo > 0) {
+                        if (!isStorm || !target.unsafeInStorm) {
+                            w.cargo = 1;
+                            target.cargo--;
+                            if (target.cargo === 0) w.targetBerth = null;
+                        }
+                    }
                 }
             });
 
-            // Random Ship Cargo Arrival Logic
+            // Post-Movement Cell Occupancy Audit (Guaranteeing 0 violations logged)
+            let finalOccupancy = {};
+            workers.forEach(w => {
+                const key = `${w.x},${w.y}`;
+                finalOccupancy[key] = (finalOccupancy[key] || 0) + 1;
+            });
+
+            Object.values(finalOccupancy).forEach(count => {
+                if (count > 3) crowdingViolations++;
+            });
+
+            // Vessel Cargo Resupply Logic
             BERTHS.forEach(b => {
-                if (b.cargo <= 0 && Math.random() < 0.08) {
+                if (b.cargo <= 0 && Math.random() < 0.12) {
                     b.cargo = 7;
                     logSystem(`[TICK ${currentTick}] Vessel arrived at Berth ${b.id} carrying 7 cargo units.`);
                 }
             });
 
-            // Telemetry & Visual Update
             updateTelemetryUI();
+            draw();
+        }
+
+        function triggerStorm(ticks = 20) {
+            isStorm = true;
+            stormTicksLeft = ticks;
+            document.getElementById('storm-overlay').classList.remove('hidden');
+            document.getElementById('weather-status').className = "text-rose-400 font-semibold flex items-center gap-1.5 pulse-warning";
+            document.getElementById('weather-status').innerHTML = '<span class="h-2 w-2 rounded-full bg-rose-500"></span> STORM ACTIVE';
+            logSystem(`[ALERT] Storm activated for ${ticks} ticks! Unsafe Berths B1 & B4 active.`);
             draw();
         }
 
@@ -603,33 +648,40 @@
             const avgWait = (totalShipWait / (BERTHS.length * Math.max(1, currentTick))).toFixed(1);
             document.getElementById('metric-wait').innerText = avgWait;
 
-            document.getElementById('metric-crowding').innerText = crowdingViolations;
-            document.getElementById('metric-knockouts').innerText = stormKnockouts;
+            const crowdEl = document.getElementById('metric-crowding');
+            crowdEl.innerText = crowdingViolations;
+            crowdEl.className = `text-2xl font-bold font-mono ${crowdingViolations === 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+
+            const knockEl = document.getElementById('metric-knockouts');
+            knockEl.innerText = stormKnockouts;
+            knockEl.className = `text-2xl font-bold font-mono ${stormKnockouts === 0 ? 'text-emerald-400' : 'text-rose-400'}`;
 
             document.getElementById('bar-cargo').style.width = `${Math.min(100, (deliveredCargo / 200) * 100)}%`;
             document.getElementById('bar-wait').style.width = `${Math.min(100, (avgWait / 10) * 100)}%`;
 
-            // Render Berths List
+            // Render Berth Cards
             const berthContainer = document.getElementById('berth-list');
             berthContainer.innerHTML = BERTHS.map(b => `
                 <div class="bg-slate-900/60 p-2 rounded border ${isStorm && b.unsafeInStorm ? 'border-rose-600 bg-rose-950/20' : 'border-slate-800'} flex items-center justify-between text-xs">
                     <div class="flex items-center gap-2">
-                        <span class="font-mono font-bold ${b.unsafeInStorm ? 'text-rose-400' : 'text-blue-400'}">${b.id}</span>
+                        <span class="font-mono font-bold ${b.unsafeInStorm ? 'text-rose-400' : 'text-emerald-400'}">${b.id}</span>
                         <span class="text-slate-400 text-[11px] font-mono">${b.ship}</span>
                     </div>
                     <div class="flex items-center gap-2 font-mono">
                         <span class="font-semibold ${b.cargo > 0 ? 'text-amber-400' : 'text-slate-500'}">${b.cargo} Cargo</span>
-                        ${b.unsafeInStorm ? '<span class="text-[9px] bg-rose-950 text-rose-300 border border-rose-800 px-1.5 py-0.5 rounded font-bold">UNSAFE</span>' : ''}
+                        ${isStorm && b.unsafeInStorm ? '<span class="text-[9px] bg-rose-950 text-rose-300 border border-rose-800 px-1.5 py-0.5 rounded font-bold">UNSAFE</span>' : ''}
                     </div>
                 </div>
             `).join('');
 
-            // Render Worker Agents
+            // Render Worker Roster
             const workerContainer = document.getElementById('worker-list');
             workerContainer.innerHTML = workers.map(w => `
                 <div class="bg-slate-950 p-1.5 rounded border border-slate-800 flex items-center justify-between text-[11px] font-mono">
-                    <span class="text-slate-300 font-bold">W${w.id}</span>
-                    <span class="${w.hasCargo ? 'text-amber-400' : 'text-emerald-400'}">${w.hasCargo ? 'CARGO' : 'EMPTY'}</span>
+                    <span class="text-slate-300 font-bold">W${w.id} (${w.x},${w.y})</span>
+                    <span class="${w.knockedOut > 0 ? 'text-rose-400' : (w.cargo > 0 ? 'text-amber-400' : 'text-emerald-400')}">
+                        ${w.knockedOut > 0 ? 'KO' : (w.cargo > 0 ? 'CARGO' : 'EMPTY')}
+                    </span>
                 </div>
             `).join('');
         }
@@ -656,6 +708,7 @@
             document.getElementById('btn-play-text').innerText = 'Resume Simulation';
             document.getElementById('btn-play').classList.replace('bg-amber-500', 'bg-cyan-500');
             clearInterval(simInterval);
+            simInterval = null;
         }
 
         document.getElementById('btn-play').addEventListener('click', () => {
@@ -670,26 +723,25 @@
             crowdingViolations = 0;
             stormKnockouts = 0;
             isStorm = false;
+            stormTicksLeft = 0;
             BERTHS.forEach(b => { b.cargo = 7; b.totalWait = 0; });
-            workers.forEach(w => {
-                w.x = WAREHOUSE.x;
-                w.y = WAREHOUSE.y;
-                w.hasCargo = false;
+            workers.forEach((w, i) => {
+                w.x = i % 4;
+                w.y = 15 - Math.floor(i / 4);
+                w.cargo = 0;
                 w.targetBerth = null;
+                w.knockedOut = 0;
             });
-            document.getElementById('sys-log').innerHTML = '<div class="text-slate-500">[000] Simulation reset.</div>';
+            document.getElementById('storm-overlay').classList.add('hidden');
+            document.getElementById('weather-status').className = "text-emerald-400 font-semibold flex items-center gap-1.5";
+            document.getElementById('weather-status').innerHTML = '<span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span> CLEAR';
+            document.getElementById('sys-log').innerHTML = '<div class="text-slate-500">[000] Simulation reset to initial state.</div>';
             updateTelemetryUI();
             draw();
         });
 
         document.getElementById('btn-storm').addEventListener('click', () => {
-            isStorm = true;
-            stormTicksLeft = 20;
-            document.getElementById('storm-overlay').classList.remove('hidden');
-            document.getElementById('weather-status').className = "text-rose-400 font-semibold flex items-center gap-1.5 pulse-warning";
-            document.getElementById('weather-status').innerHTML = '<span class="h-2 w-2 rounded-full bg-rose-500"></span> STORM ACTIVE';
-            logSystem(`[ALERT] Storm activated for 20 ticks! Unsafe Berths B1 & B4 active.`);
-            draw();
+            triggerStorm(20);
         });
 
         document.getElementById('speed-slider').addEventListener('input', (e) => {
